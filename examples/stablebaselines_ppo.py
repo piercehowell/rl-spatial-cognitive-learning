@@ -1,12 +1,16 @@
 import gym
 import gym_gridverse
-from stable_baselines3 import PPO, A2C
+from stable_baselines3 import PPO
 from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
 from gym_gridverse.gym import outer_env_factory, GymEnvironment
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnvWrapper
 
 
 class SelectKeysWrapper(gym.Wrapper):
+    """
+    This wrapper remaps the observation dictionary to only
+    include the partial observation of the agent.
+    """
     def __init__(self, env, keys):
         super().__init__(env)
         self.keys = keys
