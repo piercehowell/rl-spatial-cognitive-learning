@@ -41,7 +41,7 @@ def scale_data_min_max(embeddings, true_ldmrk_locs):
     return embeddings, true_ldmrk_locs 
 
 
-def mds_handler(cog_map_dist_matrix, true_ldmrk_locs, seed=1):
+def mds_cognitive_mapping(cog_map_dist_matrix, true_ldmrk_locs, seed=1):
     """
     Perform multi-dimensional scaling on the 'cog_map_dist_matrix' 
     which is an NxN matrix containing distances between N landmark 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     dist_matrix = euclidean_distances(_true_ldmrk_locs)
 
     # run the function
-    fig = mds_handler(dist_matrix, true_ldmrk_locs)
+    fig = mds_cognitive_mapping(dist_matrix, true_ldmrk_locs)
     # save the figure
     fig.savefig('test_mds.png')
     plt.show()
