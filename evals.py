@@ -62,10 +62,11 @@ class CognitiveMapEvaluation:
 
             # reset the environment so that the agent begins at the landmark location
             # pass in the starting point and goal ldmrk
-            # TODO
+            # TODO: Update the environment such that on reset we can set the agents
+            # starting landmark and goal landmark
             obs_at_ldmrk = self.env.reset(ldmrk_loc, self.goal_ldmrk)
 
-            # take an action
+            # take an action and get the requested hidden layer of that activation
             action, hidden_layer_activation = self.policy(obs_at_ldmrk)
 
             # save the hidden_layer_activation
@@ -73,6 +74,8 @@ class CognitiveMapEvaluation:
 
         # generate the cognitive map
         cog_map = mds_cognitive_mapping(self.hidden_layer_activations)
+
+        # Save the cognitive map to wandb or something else.
         return cog_map
 
             
