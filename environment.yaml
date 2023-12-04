@@ -1,0 +1,24 @@
+name: rl_spatial_cog
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - tqdm
+  - matplotlib
+  - seaborn
+  - scipy
+  - pip:
+    - torchrl==0.2.0
+    - swig
+    - wandb
+    - hydra-core
+    - imageio
+    - mujoco
+    # - gym>=0.26.2
+    - gym<=0.21.0
+    - miniworld
+    - scikit-learn
+    - hydra-core
+    - tensorboard
+    - sb3-contrib
