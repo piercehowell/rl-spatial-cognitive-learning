@@ -81,12 +81,12 @@ def mds_cognitive_mapping(cog_map_dist_matrix, true_ldmrk_locs, seed=1):
     # rescale the data
     # pos *= np.sqrt(np.sum((true_ldmrk_locs**2), axis=None)) / np.sqrt(np.sum((pos**2), axis=None))
     # npos *= np.sqrt((true_ldmrk_locs**2).sum()) / np.sqrt((npos**2).sum())
-    pos, true_ldmrk_locs = scale_data_min_max(pos, true_ldmrk_locs)
+    # pos, true_ldmrk_locs = scale_data_min_max(pos, true_ldmrk_locs)
     pos, _, _ = procrustes(true_ldmrk_locs, pos)
     pos, true_ldmrk_locs = shift_embedding_to_reference(pos, true_ldmrk_locs, reference_idx=0)
 
     # rotate the data
-    clf = PCA(n_components=2)
+    # clf = PCA(n_components=2)
     # true_ldmrk_locs = clf.fit_transform(true_ldmrk_locs)
     # pos = clf.fit_transform(pos)
     # npos = clf.fit_transform(npos)
