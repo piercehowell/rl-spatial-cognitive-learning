@@ -1,8 +1,9 @@
 # rl-spatial-cognitive-learning
-# To use custom reset function
+# To set custom reset function
 If using miniconda environment, replace the "reset_functions.py" located in:
 /home/usr/miniconda/envs/hml_gridverse/lib/python 3.11/site-packages/gym-gridverse/utils
 
+# To use custom functions in env
 You can select the reset function in "gv_four_rooms.9x9.yaml" by changing the value of "name" under the "reset function" section, the custom function are:
 - Agent_1_Goal_1
 - Agent_1_Goal_3
