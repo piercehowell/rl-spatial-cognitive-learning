@@ -13,6 +13,7 @@ import wandb
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import os
+from evals import CognitiveMapEvaluation
 
 
 #Setup environment
@@ -45,7 +46,7 @@ def run_experiment(cfg):
         # model.save("ppo_gridworld_9x9_raytracing_1_8M")
 
     elif(cfg.mode == "eval"):
-        evaluate_model(cfg)
+        evaluate_model(env, cfg)
 
 def visualize(model):
     """
@@ -80,22 +81,38 @@ def load_policy(env, cfg):
     Load the specified stable baselines model
     """
 
-    if cfg.policy_type=="RecurrentPPO":
-        model = RecurrentPPO("MlpLstmPolicy", env, verbose=2, device=cfg.device ,n_steps=2048,tensorboard_log=f"./results/{wandb.run.id}")
+    if cfg.model.policy_type=="RecurrentPPO":
+        model = RecurrentPPO("MlpLstmPolicy", env, verbose=2, 
+                    device=cfg.device, n_steps=cfg.model.n_steps,
+                    tensorboard_log=f"./results/tb/{wandb.run.id}")
     
     return model
 
-def evaluate_model(cfg):
+def evaluate_model(env, cfg):
     """
     Evaluates the desired model
     """
+
+    # TODO: Get the landmarks and goal landmark from a specific configuration.
+
+    # Load up the saved models to evaluate on.
+    # TODO: Organize the saved modes in ascending order by step count
+    # and iterate the evaluation for each model.
+    evaluation_models_dir = "./evaluation_models/recurrent_ppo_test"
+    file_names = os.listdir(evaluation_models_dir)
+
+    # initialize the policy
+    policy = load_policy(env, cfg)
+    policy.load(file_names[0]) # TODO: This is just for testing, we will actually iterate throught file names later
+
     if(cfg.eval_type == "CognitiveMapping"):
-        pass
+        CognitiveMapEvaluation(env, landmarks, goal_landmark, policy)
+
 
 def train_model(env, cfg):
 
     total_timesteps = cfg.model.total_timesteps
-    model = RecurrentPPO("MlpLstmPolicy", env, verbose=2, device=cfg.device, n_steps=cfg.model.n_steps,tensorboard_log=f"./results/tb/{wandb.run.id}")
+    model = load_policy(env, cfg)
 
     # Save the model every 100k steps
     checkpoint_callback = CheckpointCallback(save_freq=cfg.model.save_freq, save_path=f'./results/models/{wandb.run.id}', name_prefix='ppo_model_9x9')
