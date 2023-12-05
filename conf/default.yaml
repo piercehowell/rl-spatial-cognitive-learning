@@ -1,0 +1,18 @@
+
+device: "cpu"
+mode: train
+eval_type: 'CognitiveMapping'
+
+# model saving
+model:
+  policy_type: "RecurrentPPO"
+  name_prefix: 'ppo_model_9x9'
+  save_freq: 10_000
+  total_timesteps: 2_000_000
+  n_steps: 2048
+
+wandb:
+  mode: 'online'
+
+
+
