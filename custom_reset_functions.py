@@ -121,7 +121,7 @@ def build_grid_world():
 
 
 @reset_function_registry.register
-def landmark_start_and_goal(*, rng: Optional[rnd.Generator] = None, landmark_start: Optional[Tuple]=(1,2), landmark_goal: Optional[Tuple]=(1,1)) -> State:
+def landmark_start_and_goal(landmark_start: Optional[Tuple]=(1,2), landmark_goal: Optional[Tuple]=(1,1),*, rng: Optional[rnd.Generator] = None) -> State:
     """
     Resets the agent at landmark start and sets the agent's goal to landmark_goal.
     The landmarks are given as Tuple representing the positions in the map

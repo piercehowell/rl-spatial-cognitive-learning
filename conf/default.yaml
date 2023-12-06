@@ -1,8 +1,9 @@
 
 device: "cpu"
-mode: train
+mode: eval
 eval_type: 'CognitiveMapping'
 environment: 'gv_four_rooms.9x9_eval.yaml'
+seed: 1
 
 # model saving
 model:
@@ -13,7 +14,7 @@ model:
   n_steps: 2048
 
 wandb:
-  mode: 'online'
+  mode: 'disabled'
 
 
 

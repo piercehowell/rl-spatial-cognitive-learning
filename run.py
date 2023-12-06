@@ -1,6 +1,5 @@
-import gym
-import gym_gridverse
 import torch
+import yaml
 import numpy as np
 from stable_baselines3 import PPO
 from sb3_contrib import RecurrentPPO
@@ -8,15 +7,16 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
-from gym_gridverse.gym import outer_env_factory, GymEnvironment
-from gym_gridverse.outer_env import OuterEnv
-from gym_gridverse.representations.observation_representations import (
-    make_observation_representation,
-)
-from gym_gridverse.representations.state_representations import (
-    make_state_representation,
-)
+# from gym_gridverse.envs.yaml.factory import factory_env_from_yaml, factory_env_from_data
+# from gym_gridverse.gym import outer_env_factory, GymEnvironment
+# from gym_gridverse.outer_env import OuterEnv
+# from gym_gridverse.representations.observation_representations import (
+#     make_observation_representation,
+# )
+# from gym_gridverse.representations.state_representations import (
+#     make_state_representation,
+# )
+from utils import make_env_from_yaml
 
 from wandb.integration.sb3 import WandbCallback
 import wandb
@@ -29,24 +29,12 @@ from evals import CognitiveMapEvaluation
 # directory of run.py
 script_path = os.path.dirname(os.path.abspath(__file__))
 
-#Setup environment
-class FlattenObservationWrapper(gym.ObservationWrapper):
-	def __init__(self, env):
-		super().__init__(env)
-		total_size = sum(np.prod(env.observation_space.spaces[key].shape) for key in env.observation_space.spaces)
-		self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(total_size,), dtype=np.float32)
-
-	def observation(self, observation):
-		# Flatten each part of the observation and then concatenate
-		flattened_obs = np.concatenate([observation[key].flatten() for key in observation])
-		return flattened_obs
-
 def run_experiment(cfg):
     """
     Runs the experiment
     """
     # build the environment
-    env = make_env(cfg)
+    env = make_env_from_yaml(cfg)
 
     if(cfg.mode == "train"):
 
@@ -80,30 +68,41 @@ def visualize(model, env):
         if dones:
             obs = env.reset()
      
-def make_env(cfg):
-    """
-    Make the environment
-    """
-    inner_env = factory_env_from_yaml(os.path.join(script_path, 'environments', cfg.environment))
-    state_representation = make_state_representation(
-        'default',
-        inner_env.state_space,
-    )
-    observation_representation = make_observation_representation(
-        'default',
-        inner_env.observation_space,
-    )
-    outer_env = OuterEnv(
-        inner_env,
-        state_representation=state_representation,
-        observation_representation=observation_representation,
-    )
-    env = GymEnvironment(outer_env)
+# def make_env(cfg):
+#     """
+#     Make the environment
+#     """
+#     # what are the registered reset functions
+#     # TODO: Edit this to look like https://github.com/abaisero/gym-gridverse/blob/07909d928595f44e152c8dd88bc38198d1a7f2a4/gym_gridverse/envs/yaml/factory.py#L242
+#     # but reset any parameter you desire.
+#     # inner_env = factory_env_from_yaml(os.path.join(script_path, 'environments', cfg.environment))
+#     path = os.path.join(script_path, 'environments', cfg.environment)
+#     with open(path) as f:
+#         data = yaml.safe_load(f)
+#         inner_env = factory_env_from_data(data)
+         
+#     state_representation = make_state_representation(
+#         'default',
+#         inner_env.state_space,
+#     )
+#     observation_representation = make_observation_representation(
+#         'default',
+#         inner_env.observation_space,
+#     )
+#     outer_env = OuterEnv(
+#         inner_env,
+#         state_representation=state_representation,
+#         observation_representation=observation_representation,
+#     )
+#     env = GymEnvironment(outer_env)
+
+#     # from gym_gridverse.envs.reset_functions import reset_function_registry
+#     # print(reset_function_registry.keys())
 
 
-    # env= gym.make("GV-FourRooms-9x9-v0")
-    env = FlattenObservationWrapper(env)
-    return env
+#     # env= gym.make("GV-FourRooms-9x9-v0")
+#     env = FlattenObservationWrapper(env)
+#     return env
 
 #Training function
 
@@ -123,22 +122,38 @@ def evaluate_model(env, cfg):
     """
     Evaluates the desired model
     """
+    seed_value = cfg.seed
+    np.random.seed(cfg.seed)
+    # Set seed for CPU
+    torch.manual_seed(seed_value)
+
+    # Set seed for GPU if available
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)
 
     # TODO: Get the landmarks and goal landmark from a specific configuration.
+    landmarks = {'A':(1,1), 'B':(2,3), 'C':(3,6), 'D':(6,2),'E':(6,5),'F':(7,7)}
+    goal_landmark = {'C':(3,6)}
 
     # Load up the saved models to evaluate on.
     # TODO: Organize the saved modes in ascending order by step count
     # and iterate the evaluation for each model.
-    evaluation_models_dir = "./evaluation_models/recurrent_ppo_test"
+    base_dir = os.path.join(script_path, 'evaluation_models', 'recurrent_ppo_test')
+    evaluation_models_dir = base_dir
     file_names = os.listdir(evaluation_models_dir)
+    file_names = [name.rstrip('.zip') for name in file_names] # remove the .zip extension (stable baselines doesn't expect it)
 
     # initialize the policy
     policy = load_policy(env, cfg)
-    policy.load(file_names[0]) # TODO: This is just for testing, we will actually iterate throught file names later
+    policy.load(os.path.join(base_dir, 'ppo_model_9x9_2040_steps')) # TODO: This is just for testing, we will actually iterate throught file names later
+
+    # TODO: Specify the hidden layers in the configuration file
+    print(policy.policy)
 
     if(cfg.eval_type == "CognitiveMapping"):
-        CognitiveMapEvaluation(env, landmarks, goal_landmark, policy)
-
+        eval_module = CognitiveMapEvaluation(cfg, env, landmarks, goal_landmark, policy)
+        eval_module()
 
 def train_model(env, cfg):
 
