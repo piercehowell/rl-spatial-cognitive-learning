@@ -8,6 +8,16 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+from gym_gridverse.envs.yaml.factory import factory_env_from_yaml
+from gym_gridverse.gym import outer_env_factory, GymEnvironment
+from gym_gridverse.outer_env import OuterEnv
+from gym_gridverse.representations.observation_representations import (
+    make_observation_representation,
+)
+from gym_gridverse.representations.state_representations import (
+    make_state_representation,
+)
+
 from wandb.integration.sb3 import WandbCallback
 import wandb
 import hydra
@@ -15,6 +25,9 @@ from omegaconf import DictConfig, OmegaConf
 import os
 from evals import CognitiveMapEvaluation
 
+
+# directory of run.py
+script_path = os.path.dirname(os.path.abspath(__file__))
 
 #Setup environment
 class FlattenObservationWrapper(gym.ObservationWrapper):
@@ -33,7 +46,7 @@ def run_experiment(cfg):
     Runs the experiment
     """
     # build the environment
-    env = make_env()
+    env = make_env(cfg)
 
     if(cfg.mode == "train"):
 
@@ -69,10 +82,30 @@ def visualize(model):
         if dones:
             obs = env.reset()
      
-def make_env():
-	env= gym.make("GV-FourRooms-9x9-v0")
-	env = FlattenObservationWrapper(env)
-	return env
+def make_env(cfg):
+    """
+    Make the environment
+    """
+    inner_env = factory_env_from_yaml(os.path.join(script_path, 'environments', cfg.environment))
+    state_representation = make_state_representation(
+        'default',
+        inner_env.state_space,
+    )
+    observation_representation = make_observation_representation(
+        'default',
+        inner_env.observation_space,
+    )
+    outer_env = OuterEnv(
+        inner_env,
+        state_representation=state_representation,
+        observation_representation=observation_representation,
+    )
+    env = GymEnvironment(outer_env)
+
+
+    # env= gym.make("GV-FourRooms-9x9-v0")
+    env = FlattenObservationWrapper(env)
+    return env
 
 #Training function
 

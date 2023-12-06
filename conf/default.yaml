@@ -2,6 +2,7 @@
 device: "cpu"
 mode: train
 eval_type: 'CognitiveMapping'
+environment: 'gv_four_rooms.9x9_eval.yaml'
 
 # model saving
 model:
