@@ -61,13 +61,11 @@ def run_experiment(cfg):
     elif(cfg.mode == "eval"):
         evaluate_model(env, cfg)
 
-def visualize(model):
+def visualize(model, env):
     """
     Visualize the environment
     """
     #Visualize agent
-    env= gym.make("GV-FourRooms-9x9-v0")
-    env = FlattenObservationWrapper(env)
     obs = env.reset()
     lstm_states = None
     num_envs = 1
