@@ -15,10 +15,9 @@ observation_space:
   colors: [ NONE ]
 
 reset_function:
-  #name: rooms
   name: custom_reset_functions:landmark_start_and_goal
-  #shape: [ 9, 9 ]
-  #layout: [ 2, 2 ]
+  landmark_start: [1,1] # the landmark start and goal can be overriden during eval.
+  landmark_goal: [7,7]
 
 transition_functions:
   - name: move_agent
