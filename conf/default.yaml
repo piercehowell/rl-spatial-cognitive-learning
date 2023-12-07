@@ -1,3 +1,7 @@
+defaults:
+  - eval: cognitive_map
+  - landmark_spec: all_landmarks
+  - _self_
 
 device: "cpu"
 mode: eval

@@ -16,7 +16,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 # from gym_gridverse.representations.state_representations import (
 #     make_state_representation,
 # )
-from utils import make_env_from_yaml
+from utils import make_env_from_yaml, visualize
 
 from wandb.integration.sb3 import WandbCallback
 import wandb
@@ -36,6 +36,17 @@ def run_experiment(cfg):
     # build the environment
     env = make_env_from_yaml(cfg)
 
+    # set the seed
+    seed_value = cfg.seed
+    np.random.seed(cfg.seed)
+    # Set seed for CPU
+    torch.manual_seed(seed_value)
+    # Set seed for GPU if available
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)
+
+    # training mode
     if(cfg.mode == "train"):
 
         # train model
@@ -46,65 +57,17 @@ def run_experiment(cfg):
         print(f"Mean reward: {mean_reward}, Std reward: {std_reward}")
         # model.save("ppo_gridworld_9x9_raytracing_1_8M")
 
+    # evaluation mode
     elif(cfg.mode == "eval"):
         evaluate_model(env, cfg)
 
-def visualize(model, env):
+def load_landmark_specs(cfg):
     """
-    Visualize the environment
+    Loads up the landmarks and the corresponding adjacency matrix
     """
-    #Visualize agent
-    obs = env.reset()
-    lstm_states = None
-    num_envs = 1
-    # Episode start signals are used to reset the lstm states
-    episode_starts = np.ones((num_envs,), dtype=bool)
-    while True:
-        action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=True)
-
-        obs, rewards, dones, info = env.step(action)
-        episode_starts = dones
-        env.render()
-        if dones:
-            obs = env.reset()
-     
-# def make_env(cfg):
-#     """
-#     Make the environment
-#     """
-#     # what are the registered reset functions
-#     # TODO: Edit this to look like https://github.com/abaisero/gym-gridverse/blob/07909d928595f44e152c8dd88bc38198d1a7f2a4/gym_gridverse/envs/yaml/factory.py#L242
-#     # but reset any parameter you desire.
-#     # inner_env = factory_env_from_yaml(os.path.join(script_path, 'environments', cfg.environment))
-#     path = os.path.join(script_path, 'environments', cfg.environment)
-#     with open(path) as f:
-#         data = yaml.safe_load(f)
-#         inner_env = factory_env_from_data(data)
-         
-#     state_representation = make_state_representation(
-#         'default',
-#         inner_env.state_space,
-#     )
-#     observation_representation = make_observation_representation(
-#         'default',
-#         inner_env.observation_space,
-#     )
-#     outer_env = OuterEnv(
-#         inner_env,
-#         state_representation=state_representation,
-#         observation_representation=observation_representation,
-#     )
-#     env = GymEnvironment(outer_env)
-
-#     # from gym_gridverse.envs.reset_functions import reset_function_registry
-#     # print(reset_function_registry.keys())
-
-
-#     # env= gym.make("GV-FourRooms-9x9-v0")
-#     env = FlattenObservationWrapper(env)
-#     return env
-
-#Training function
+    landmarks = cfg.landmark_spec.landmarks
+    A = np.array(cfg.landmark_spec.adjacency_matrix)
+    return landmarks, A
 
 def load_policy(env, cfg):
     """
@@ -122,19 +85,12 @@ def evaluate_model(env, cfg):
     """
     Evaluates the desired model
     """
-    seed_value = cfg.seed
-    np.random.seed(cfg.seed)
-    # Set seed for CPU
-    torch.manual_seed(seed_value)
-
-    # Set seed for GPU if available
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed_value)
-        torch.cuda.manual_seed_all(seed_value)
 
     # TODO: Get the landmarks and goal landmark from a specific configuration.
-    landmarks = {'A':(1,1), 'B':(2,3), 'C':(3,6), 'D':(6,2),'E':(6,5),'F':(7,7)}
-    goal_landmark = {'C':(3,6)}
+    # landmarks = {'A':(1,1), 'B':(2,3), 'C':(3,6), 'D':(6,2),'E':(6,5),'F':(7,7)}
+    # goal_landmark = {'C':(3,6)}
+
+    landmarks, A = load_landmark_specs(cfg)
 
     # Load up the saved models to evaluate on.
     # TODO: Organize the saved modes in ascending order by step count
@@ -151,8 +107,8 @@ def evaluate_model(env, cfg):
     # TODO: Specify the hidden layers in the configuration file
     print(policy.policy)
 
-    if(cfg.eval_type == "CognitiveMapping"):
-        eval_module = CognitiveMapEvaluation(cfg, env, landmarks, goal_landmark, policy)
+    if(cfg.eval.name == "CognitiveMapEvaluation"):
+        eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
         eval_module()
 
 def train_model(env, cfg):
