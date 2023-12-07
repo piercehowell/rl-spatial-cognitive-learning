@@ -24,6 +24,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import os
 from evals import CognitiveMapEvaluation
+from copy import deepcopy
 
 
 # directory of run.py
@@ -85,31 +86,40 @@ def evaluate_model(env, cfg):
     """
     Evaluates the desired model
     """
-
-    # TODO: Get the landmarks and goal landmark from a specific configuration.
-    # landmarks = {'A':(1,1), 'B':(2,3), 'C':(3,6), 'D':(6,2),'E':(6,5),'F':(7,7)}
-    # goal_landmark = {'C':(3,6)}
-
     landmarks, A = load_landmark_specs(cfg)
 
     # Load up the saved models to evaluate on.
     # TODO: Organize the saved modes in ascending order by step count
     # and iterate the evaluation for each model.
-    base_dir = os.path.join(script_path, 'evaluation_models', 'recurrent_ppo_test')
-    evaluation_models_dir = base_dir
+    evaluation_models_dir = os.path.join(script_path, 'evaluation_models', cfg.eval.evaluation_model)
     file_names = os.listdir(evaluation_models_dir)
-    file_names = [name.rstrip('.zip') for name in file_names] # remove the .zip extension (stable baselines doesn't expect it)
-
+    model_checkpoints = [name.rstrip('.zip') for name in file_names] # remove the .zip extension (stable baselines doesn't expect it)
+    get_step = lambda x: int(x.split('_')[-2])
+    model_checkpoints.sort(key=get_step)
+    
     # initialize the policy
-    policy = load_policy(env, cfg)
-    policy.load(os.path.join(base_dir, 'ppo_model_9x9_2040_steps')) # TODO: This is just for testing, we will actually iterate throught file names later
-
-    # TODO: Specify the hidden layers in the configuration file
-    print(policy.policy)
+    
+    
 
     if(cfg.eval.name == "CognitiveMapEvaluation"):
-        eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
-        eval_module()
+
+        # iterate through each of the trained models and run the evaluation to get the cognitive map 
+        # eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
+        # model_checkpoints = ['ppo_model_9x9_40_steps']
+        for model_checkpoint in model_checkpoints:
+            print(f"Running Cognitive Map evaluation for model checkpoint: {model_checkpoint}")
+            policy = load_policy(env, cfg)
+            policy.load(os.path.join(evaluation_models_dir, model_checkpoint))
+            # print(policy.policy)
+            # eval_module.policy = policy
+            eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
+            cog_map_fig, disparity = eval_module()
+            
+            step = get_step(model_checkpoint)
+            print(f'step: {step}')
+            wandb.log({'eval/cog_map':cog_map_fig,
+                       'eval/disparity':disparity}, step=step)
+            # wandb.log({'eval/disparity':disparity}, step=step)
 
 def train_model(env, cfg):
 

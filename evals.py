@@ -49,9 +49,9 @@ class HiddenLayerExtractor(nn.Module):
 
         # register a hook to get the hidden layer
         for name, module in self.policy.policy.named_modules():
-            print(f"Module name: {name}")
+            # print(f"Module name: {name}")
             if name == hidden_layer_name:
-                print(f"HiddenLayerExtractor registering output of module {name}")
+                # print(f"HiddenLayerExtractor registering output of module {name}")
                 module.register_forward_hook(self._hidden_layer_hook)
                 break
         
@@ -68,10 +68,10 @@ class HiddenLayerExtractor(nn.Module):
         """
         Forward pass
         """
-        # with torch.no_grad():
-        episode_starts = torch.tensor(np.ones((1,), dtype=bool))
-        obs = torch.tensor(obs)
-        action, lstm_states = self.policy.predict(obs, state, episode_starts)
+        with torch.no_grad():
+            episode_starts = torch.tensor(np.ones((1,), dtype=bool))
+            obs = torch.tensor(obs)
+            action, lstm_states = self.policy.predict(obs, state, episode_starts, deterministic=deterministic)
         return action, self.hidden_layer_output, lstm_states
     
 
@@ -90,7 +90,7 @@ class CognitiveMapEvaluation(nn.Module):
         self._A = A # adjacency matrix
 
         # wrap the policy in a module to extract a hidden layer from the policy
-        self.policy = HiddenLayerExtractor(policy, 'mlp_extractor.policy_net')
+        self._policy = HiddenLayerExtractor(policy, cfg.eval.hidden_layer_activation)
         self._dist_func = dist_func
         self.hidden_layer_activations = {}
         self._seed = seed
@@ -118,7 +118,7 @@ class CognitiveMapEvaluation(nn.Module):
             lstm_states = None
 
             # take an action and get the requested hidden layer of that activation
-            action, hidden_layer_activation, lstm_states = self.policy(obs_at_landmark, lstm_states)
+            action, hidden_layer_activation, lstm_states = self._policy(obs_at_landmark, lstm_states)
             # print(f"Hidden Layer activation: {hidden_layer_activation}")
             # save the hidden_layer_activation
             # self.hidden_layer_activations.append(hidden_layer_activation)
@@ -132,7 +132,7 @@ class CognitiveMapEvaluation(nn.Module):
         cog_map, disparity = mds_cognitive_mapping(dist_matrix, self._landmarks, self._seed)
 
         # Save the cognitive map to wandb or something else.
-        return cog_map,
+        return cog_map, disparity
     
     @property
     def landmarks(self):
@@ -141,6 +141,15 @@ class CognitiveMapEvaluation(nn.Module):
     @landmarks.setter
     def landmarks(self, value: List[Dict[str, Tuple]]):
         self._landmarks = value
+
+    @property
+    def policy(self):
+        return self._policy
+    
+    @policy.setter
+    def policy(self, policy):
+        print("Resetting policy")
+        self._policy = HiddenLayerExtractor(policy, self._cfg.eval.hidden_layer_activation)
 
             
     def hidden_layers_to_distance_matrix(self, hidden_layer_activations_struct: List[torch.tensor], dist_func: Callable=cosine_distances):
@@ -171,10 +180,6 @@ class CognitiveMapEvaluation(nn.Module):
                 dist_matrix_goal_conditioned[a,b,c,d] = dist_func(hidden_layer_activation_i, hidden_layer_activation_j)
         # average over all the goal conditions
         dist_matrix = np.mean(dist_matrix_goal_conditioned, axis=(0,1))
-
-        # for i, hidden_layer_activation_i in enumerate(hidden_layer_activations_struct):
-        #     for j, hidden_layer_activation_j in enumerate(hidden_layer_activations_struct):
-        #         dist_matrix[i, j] = dist_func(hidden_layer_activation_i, hidden_layer_activation_j)
         return dist_matrix
 
 
