@@ -14,6 +14,7 @@ import os
 from utils import make_env_from_data
 from plotting import plot_cognitive_map
 import yaml
+from copy import deepcopy
 
 
 # directory of run.py
@@ -48,9 +49,9 @@ class HiddenLayerExtractor(nn.Module):
 
         # register a hook to get the hidden layer
         for name, module in self.policy.policy.named_modules():
-            print(f"Module name: {name}")
+            # print(f"Module name: {name}")
             if name == hidden_layer_name:
-                print(f"HiddenLayerExtractor registering output of module {name}")
+                # print(f"HiddenLayerExtractor registering output of module {name}")
                 module.register_forward_hook(self._hidden_layer_hook)
                 break
         
@@ -67,10 +68,10 @@ class HiddenLayerExtractor(nn.Module):
         """
         Forward pass
         """
-        # with torch.no_grad():
-        episode_starts = torch.tensor(np.ones((1,), dtype=bool))
-        obs = torch.tensor(obs)
-        action, lstm_states = self.policy.predict(obs, state, episode_starts)
+        with torch.no_grad():
+            episode_starts = torch.tensor(np.ones((1,), dtype=bool))
+            obs = torch.tensor(obs)
+            action, lstm_states = self.policy.predict(obs, state, episode_starts, deterministic=deterministic)
         return action, self.hidden_layer_output, lstm_states
     
 
@@ -79,66 +80,60 @@ class CognitiveMapEvaluation(nn.Module):
     Applies the MDS Cognitive Mapping algorithm to hidden layers
     of a policy at prespecified landmarks.
     """
-    def __init__(self, cfg, env: gym.Env, landmarks: Dict[str, List], goal_ldmrk: Dict[str, List], policy: nn.Module, dist_func: Callable=cosine_distances, seed: int=1):
+    def __init__(self, cfg, env: gym.Env, landmarks: Dict[str, List], A: np.array, policy: nn.Module, dist_func: Callable=cosine_distances, seed: int=1):
         """
         """
         super(CognitiveMapEvaluation, self).__init__()
 
         self.env = env
         self._landmarks = landmarks
+        self._A = A # adjacency matrix
 
         # wrap the policy in a module to extract a hidden layer from the policy
-        self.policy = HiddenLayerExtractor(policy, 'mlp_extractor.policy_net')
-        self._goal_ldmrk = goal_ldmrk
+        self._policy = HiddenLayerExtractor(policy, cfg.eval.hidden_layer_activation)
         self._dist_func = dist_func
-        self.hidden_layer_activations = []
+        self.hidden_layer_activations = {}
         self._seed = seed
         self._cfg = cfg
 
     def forward(self):
         """Run the evaluate an output the cognitive map and corresponding meta-data"""
 
-        ldmrk_locs = []
-        goal_ldmrk_name = list(self._goal_ldmrk.keys())[0]
-        goal_ldmrk_loc = self._goal_ldmrk[goal_ldmrk_name]
-        for ldmrk_name, ldmrk_loc in self._landmarks.items():
-            ldmrk_locs.append(list(ldmrk_loc))
-            # reset the environment so that the agent begins at the landmark location
-            # pass in the starting point and goal ldmrk
-            # TODO: Update the environment such that on reset we can set the agents
-            # starting landmark and goal landmark
+        # The evaluation is ran for all pairwise landmarks that are connected (see adjacency matrix)
+        N = self._A.shape[0] # should be NxN
+        # map the index to alphabettical value
+        # index_2_ldmrk_key = lambda i,j : [chr(i+ord('A')), chr(j+ord('A'))]
+        indicies = np.nonzero(self._A)
+        landmark_graph = [(chr(i+ord('A')), chr(j+ord('A'))) for i, j in zip(*indicies)]
+
+        for landmark_start_key, landmark_goal_key in landmark_graph:
+            
+            landmark_start_pos = self._landmarks[landmark_start_key]
+            landmark_goal_pos = self._landmarks[landmark_goal_key]
 
             # remake the environment
-            env = make_env_for_landmark_setting(ldmrk_loc, goal_ldmrk_loc, self._cfg)
-
-            obs_at_ldmrk = env.reset()
+            env = make_env_for_landmark_setting(landmark_start_pos, landmark_goal_pos, self._cfg)
+            obs_at_landmark = env.reset()
 
             lstm_states = None
 
             # take an action and get the requested hidden layer of that activation
-            action, hidden_layer_activation, lstm_states = self.policy(obs_at_ldmrk, lstm_states)
-            print(f"Hidden Layer activation: {hidden_layer_activation}")
+            action, hidden_layer_activation, lstm_states = self._policy(obs_at_landmark, lstm_states)
+            # print(f"Hidden Layer activation: {hidden_layer_activation}")
             # save the hidden_layer_activation
-            self.hidden_layer_activations.append(hidden_layer_activation)
+            # self.hidden_layer_activations.append(hidden_layer_activation)
+            self.hidden_layer_activations[(landmark_start_key, landmark_goal_key)] = hidden_layer_activation
         
         # compute the distance matrix for the hidden layer activations
-        dist_matrix = hidden_layers_to_distance_matrix(self.hidden_layer_activations, dist_func=self._dist_func)
+        dist_matrix = self.hidden_layers_to_distance_matrix(self.hidden_layer_activations, dist_func=self._dist_func)
 
 
         # generate the cognitive map and return it (as a figure)
-        cog_map, disparity = mds_cognitive_mapping(dist_matrix, np.array(ldmrk_locs), self._seed)
+        cog_map, disparity = mds_cognitive_mapping(dist_matrix, self._landmarks, self._seed)
 
         # Save the cognitive map to wandb or something else.
-        return cog_map,
+        return cog_map, disparity
     
-    @property
-    def goal_ldmrk(self):
-        return self._goal_ldmrk
-
-    @goal_ldmrk.setter
-    def goal_ldmrk(self, value: Dict[str, Tuple]):
-        self._goal_ldmrk = value
-
     @property
     def landmarks(self):
         return self._landmarks
@@ -147,19 +142,45 @@ class CognitiveMapEvaluation(nn.Module):
     def landmarks(self, value: List[Dict[str, Tuple]]):
         self._landmarks = value
 
+    @property
+    def policy(self):
+        return self._policy
+    
+    @policy.setter
+    def policy(self, policy):
+        print("Resetting policy")
+        self._policy = HiddenLayerExtractor(policy, self._cfg.eval.hidden_layer_activation)
+
             
-def hidden_layers_to_distance_matrix(hidden_layer_activations_struct: List[torch.tensor], dist_func: Callable=cosine_distances):
-    """
-    Builds a distance matrix between the pairwise distances of hidden layer activations.
-    The output distance matrix is NxN, where N is the number of landmarks
-    """
-    # TODO: Make this function faster with tensorization.
-    N = len(hidden_layer_activations_struct)
-    dist_matrix = np.zeros((N, N))
-    for i, hidden_layer_activation_i in enumerate(hidden_layer_activations_struct):
-        for j, hidden_layer_activation_j in enumerate(hidden_layer_activations_struct):
-            dist_matrix[i, j] = dist_func(hidden_layer_activation_i, hidden_layer_activation_j)
-    return dist_matrix
+    def hidden_layers_to_distance_matrix(self, hidden_layer_activations_struct: List[torch.tensor], dist_func: Callable=cosine_distances):
+        """
+        Builds a distance matrix between the pairwise distances of hidden layer activations.
+        Note, each hidden layer is actually attached to a give landmark start/goal pair. Thus
+        we compute the distances beween activations for different start postions over the same goal.
+        We then average over all the goals.
+        The output distance matrix is NxN, where N is the number of landmarks
+        """
+        # TODO: Make this function faster with tensorization.
+        # N = len(hidden_layer_activations_struct)
+        N = self._A.shape[0]
+        key_to_int = lambda x : ord(x) - ord('A')
+        dist_matrix_goal_conditioned = np.zeros((N, N, N, N)) # shape (goals_i,goals_j,landmark_start_i,landmark_start_j)
+        for key_i, value_i in hidden_layer_activations_struct.items():
+            landmark_start_key_i, landmark_goal_key_i = key_i[0], key_i[1]
+            hidden_layer_activation_i = value_i
+            for key_j, value_j in hidden_layer_activations_struct.items():
+                landmark_start_key_j, landmark_goal_key_j = key_j[0], key_j[1]
+                hidden_layer_activation_j = value_j
+
+                a,b,c,d = (key_to_int(landmark_goal_key_i), 
+                            key_to_int(landmark_goal_key_j), 
+                            key_to_int(landmark_start_key_i), 
+                            key_to_int(landmark_start_key_j))
+                
+                dist_matrix_goal_conditioned[a,b,c,d] = dist_func(hidden_layer_activation_i, hidden_layer_activation_j)
+        # average over all the goal conditions
+        dist_matrix = np.mean(dist_matrix_goal_conditioned, axis=(0,1))
+        return dist_matrix
 
 
 def scale_data_min_max(embeddings, true_ldmrk_locs):
@@ -191,7 +212,7 @@ def shift_embedding_to_reference(embeddings, true_ldmrk_locs, reference_idx=0):
 
     return embeddings, true_ldmrk_locs
 
-def mds_cognitive_mapping(cog_map_dist_matrix, true_ldmrk_locs, seed=1):
+def mds_cognitive_mapping(cog_map_dist_matrix: np.array, landmarks: Dict[str, List], seed: int=1):
     """
     Perform multi-dimensional scaling on the 'cog_map_dist_matrix' 
     which is an NxN matrix containing distances between N landmark 
@@ -211,6 +232,12 @@ def mds_cognitive_mapping(cog_map_dist_matrix, true_ldmrk_locs, seed=1):
         n_jobs=1,
         normalized_stress="auto",
     )
+
+    # get the landmarks into an array
+    N = len(landmarks)
+    true_ldmrk_locs = np.zeros((N,2))
+    for i in range(N):
+        true_ldmrk_locs[i,:] = landmarks[chr(ord('A')+i)]
 
     pos = mds.fit(cog_map_dist_matrix).embedding_
 

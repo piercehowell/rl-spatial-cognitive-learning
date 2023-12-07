@@ -1,8 +1,11 @@
+defaults:
+  - eval: cognitive_map
+  - landmark_spec: all_landmarks
+  - _self_
 
 device: "cpu"
-mode: eval
-eval_type: 'CognitiveMapping'
-environment: 'gv_four_rooms.9x9_eval.yaml'
+mode: train # train or eval
+environment: 'gv_four_rooms.9x9.yaml'
 seed: 1
 
 # model saving

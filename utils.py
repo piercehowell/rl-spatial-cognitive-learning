@@ -81,3 +81,23 @@ def make_env_from_data(data, cfg):
     # env= gym.make("GV-FourRooms-9x9-v0")
     env = FlattenObservationWrapper(env)
     return env
+
+def visualize(model, env):
+    """
+    Visualize the environment
+    """
+    #Visualize agent
+    obs = env.reset()
+    lstm_states = None
+    num_envs = 1
+    # Episode start signals are used to reset the lstm states
+    episode_starts = np.ones((num_envs,), dtype=bool)
+    while True:
+        action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=True)
+
+        obs, rewards, dones, info = env.step(action)
+        episode_starts = dones
+        env.render()
+        if dones:
+            obs = env.reset()
+     
