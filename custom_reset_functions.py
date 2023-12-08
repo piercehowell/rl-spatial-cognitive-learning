@@ -143,6 +143,42 @@ def landmark_start_and_goal(landmark_start: Optional[Tuple]=(1,2), landmark_goal
     
 
 @reset_function_registry.register
+def Agent_n_edges(*, rng: Optional[rnd.Generator] = None, adjacency_m: Optional[List]=[[0,1,0,0,0,0], [0,0,1,0,0,0], [0,0,0,1,0,0], [0,0,0,0,1,0], [0,0,0,0,0,1],[0,0,0,0,0,0]]) -> State:
+    """
+    Resets agent according to adjacency matrix provided in the YAML file
+    """
+    A=Position(1,1)
+    B=Position(2,3)
+    C=Position(3,6)
+    D=Position(6,2)
+    E=Position(6,5)
+    F=Position(7,7)
+    labels=[A,B,C,D,E,F]
+    grid = build_grid_world()
+
+    # must call this to include reproduceable stochasticity
+    rng = get_gv_rng_if_none(rng)
+
+    non_zero_edges = []
+
+    for i, row in enumerate(adjacency_m):
+        for j, val in enumerate(row):
+            if val != 0:
+                non_zero_edges.append((labels[i], labels[j]))
+
+    edge_chosen=choice(rng, non_zero_edges)
+
+    agent_position = [edge_chosen[0]]
+    exit_position = [edge_chosen[1]]
+
+    # set the agent at a random orientation.
+    agent_orientation = choice(rng, list(Orientation))
+
+    grid[exit_position[0]] = Exit()
+    agent = Agent(agent_position[0], agent_orientation)
+    return State(grid, agent)
+
+@reset_function_registry.register
 def Agent_1_Goal_1(
     *,
     rng: Optional[rnd.Generator] = None,
@@ -162,34 +198,13 @@ def Agent_1_Goal_1(
     grid[4,7]=Floor()
             
     # Define predetermined locations
-    agent_positions = [Position(1, 1)]  #positions
-    exit_positions = [Position(7, 7)]
-
-    # Randomly select positions
-    agent_position = choices(rng, agent_positions,size=1,replace=False)
-    exit_position = choices(rng, exit_positions,size=1,replace=False)
-
-    # Ensure they are not the same
-    while agent_position[0] == exit_position[0]:
-        exit_position = choices(rng, exit_positions,size=1,replace=False)
-
-    # sample agent and exit positions
-    #positions = [
-    #    position
-    #    for position in grid.area.positions()
-    #    if isinstance(grid[position], Floor)
-    #]
-    #agent_position, exit_position = choices(
-    #    rng,
-    #    positions,
-    #    size=2,
-    #    replace=False,
-    #)
+    agent_position = Position(1, 1)
+    exit_position = Position(7, 7)
 
     agent_orientation = choice(rng, list(Orientation))
 
-    grid[exit_position[0]] = Exit()
-    agent = Agent(agent_position[0], agent_orientation)
+    grid[exit_position] = Exit()
+    agent = Agent(agent_position, agent_orientation)
     return State(grid, agent)
     
 @reset_function_registry.register
@@ -291,4 +306,3 @@ def Agent_3_Goal_3(
     grid[exit_position[0]] = Exit()
     agent = Agent(agent_position[0], agent_orientation)
     return State(grid, agent)
-
