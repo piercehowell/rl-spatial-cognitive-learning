@@ -35,7 +35,7 @@ python run.py mode=train
 python run.py mode=eval
 ```
 ## Setting Configurations with Hydra
-You will notice that parameter (like `mode`) can be specified at the command line to control the functionality of experiments. This repository uses [Hydra](https://hydra.cc/docs/intro/), a python library for that enables hierarchical configuration (e.g. parameters) composition and override. This makes experimentation for different parameters and settings as simple as changing parameters in the defined configuration files or at the command line. **The configuration files for this project are located in the directory `[conf](https://github.com/piercehowell/rl-spatial-cognitive-learning/tree/main/conf)`**. 
+You will notice that parameter (like `mode`) can be specified at the command line to control the functionality of experiments. This repository uses [Hydra](https://hydra.cc/docs/intro/), a python library for that enables hierarchical configuration (e.g. parameters) composition and override. This makes experimentation for different parameters and settings as simple as changing parameters in the defined configuration files or at the command line. **The configuration files for this project are located in the directory [`conf`](https://github.com/piercehowell/rl-spatial-cognitive-learning/tree/main/conf)**. 
 
 You can view all of the default parameters without running the code by running
 ```bash
