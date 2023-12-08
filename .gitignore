@@ -1,6 +1,7 @@
 results/
 wandb/
 outputs/
+evaluation_models/recurrent_ppo_woven_frog_7/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

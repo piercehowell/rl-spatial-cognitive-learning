@@ -22,3 +22,5 @@ dependencies:
     - hydra-core
     - tensorboard
     - sb3-contrib
+    - pyyaml
+    - plotly

@@ -1,0 +1,15 @@
+name: "CognitiveMapEvaluation" # name of the evaluation
+
+# Name of the folder in dir /evaluation_models that
+# contains the saved models for a single policy
+# that you want to evaluate. All models in that 
+# folder will be evaluated
+evaluation_model: 'recurrent_ppo_test'
+
+# the name of the hidden layer to extract from ActorCritic policy
+# fro computing the policies representation of a cognitive map
+hidden_layer_activation: 'mlp_extractor.policy_net'
+
+# distance function for computing distances
+# between hidden layers. Imported from scipy.metrics.pairwise
+dist_func: 'scipy.metrics.pairwise.cosine_distances'

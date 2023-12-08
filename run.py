@@ -1,6 +1,5 @@
-import gym
-import gym_gridverse
 import torch
+import yaml
 import numpy as np
 from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
@@ -9,74 +8,70 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+# from gym_gridverse.envs.yaml.factory import factory_env_from_yaml, factory_env_from_data
+# from gym_gridverse.gym import outer_env_factory, GymEnvironment
+# from gym_gridverse.outer_env import OuterEnv
+# from gym_gridverse.representations.observation_representations import (
+#     make_observation_representation,
+# )
+# from gym_gridverse.representations.state_representations import (
+#     make_state_representation,
+# )
+from utils import make_env_from_yaml, visualize
+
 from wandb.integration.sb3 import WandbCallback
 import wandb
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import os
 from evals import CognitiveMapEvaluation
+from copy import deepcopy
 
 
-#Setup environment
-class FlattenObservationWrapper(gym.ObservationWrapper):
-	def __init__(self, env):
-		super().__init__(env)
-		total_size = sum(np.prod(env.observation_space.spaces[key].shape) for key in env.observation_space.spaces)
-		self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(total_size,), dtype=np.float32)
-
-	def observation(self, observation):
-		# Flatten each part of the observation and then concatenate
-		flattened_obs = np.concatenate([observation[key].flatten() for key in observation])
-		return flattened_obs
+# directory of run.py
+script_path = os.path.dirname(os.path.abspath(__file__))
 
 def run_experiment(cfg):
-	"""
-	Runs the experiment
-	"""
-	# build the environment
-	env = make_env()
+    """
+    Runs the experiment
+    """
+    # build the environment
+    env = make_env_from_yaml(cfg)
 
-	if(cfg.mode == "train"):
+    # set the seed
+    seed_value = cfg.seed
+    np.random.seed(cfg.seed)
+    # Set seed for CPU
+    torch.manual_seed(seed_value)
+    # Set seed for GPU if available
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)
 
-		# train model
-		model = train_model(env, cfg)
+    # training mode
+    if(cfg.mode == "train"):
 
-		#Test and save full trained model
-		mean_reward, std_reward = evaluate_policy(model, model.get_env(), n_eval_episodes=1)
-		print(f"Mean reward: {mean_reward}, Std reward: {std_reward}")
-		# model.save("ppo_gridworld_9x9_raytracing_1_8M")
+        # train model
+        model = train_model(env, cfg)
 
-	elif(cfg.mode == "eval"):
-		evaluate_model(env, cfg)
+        #Test and save full trained model
+        mean_reward, std_reward = evaluate_policy(model, model.get_env(), n_eval_episodes=1)
+        print(f"Mean reward: {mean_reward}, Std reward: {std_reward}")
+        # model.save("ppo_gridworld_9x9_raytracing_1_8M")
 
-def visualize(model):
-	"""
-	Visualize the environment
-	"""
-	#Visualize agent
-	env= gym.make("GV-FourRooms-9x9-v0")
-	env = FlattenObservationWrapper(env)
-	obs = env.reset()
-	lstm_states = None
-	num_envs = 1
-	# Episode start signals are used to reset the lstm states
-	episode_starts = np.ones((num_envs,), dtype=bool)
-	while True:
-		action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=True)
 
-		obs, rewards, dones, info = env.step(action)
-		episode_starts = dones
-		env.render()
-		if dones:
-			obs = env.reset()
-	 
-def make_env():
-	env= gym.make("GV-FourRooms-9x9-v0")
-	env = FlattenObservationWrapper(env)
-	env=TimeLimit(env,1000)
-	return env
+    # evaluation mode
+    elif(cfg.mode == "eval"):
+        evaluate_model(env, cfg)
 
-#Training function
+def load_landmark_specs(cfg):
+    """
+    Loads up the landmarks and the corresponding adjacency matrix
+    """
+    landmarks = cfg.landmark_spec.landmarks
+    A = np.array(cfg.landmark_spec.adjacency_matrix)
+    return landmarks, A
+
 
 def load_policy(env, cfg):
 	"""
@@ -91,25 +86,39 @@ def load_policy(env, cfg):
 	return model
 
 def evaluate_model(env, cfg):
-	"""
-	Evaluates the desired model
-	"""
+    """
+    Evaluates the desired model
+    """
+    landmarks, A = load_landmark_specs(cfg)
 
-	# TODO: Get the landmarks and goal landmark from a specific configuration.
+    # Load up the saved models to evaluate on.
+    # TODO: Organize the saved modes in ascending order by step count
+    # and iterate the evaluation for each model.
+    evaluation_models_dir = os.path.join(script_path, 'evaluation_models', cfg.eval.evaluation_model)
+    file_names = os.listdir(evaluation_models_dir)
+    model_checkpoints = [name.rstrip('.zip') for name in file_names] # remove the .zip extension (stable baselines doesn't expect it)
+    get_step = lambda x: int(x.split('_')[-2])
+    model_checkpoints.sort(key=get_step)
 
-	# Load up the saved models to evaluate on.
-	# TODO: Organize the saved modes in ascending order by step count
-	# and iterate the evaluation for each model.
-	evaluation_models_dir = "./evaluation_models/recurrent_ppo_test"
-	file_names = os.listdir(evaluation_models_dir)
+    if(cfg.eval.name == "CognitiveMapEvaluation"):
 
-	# initialize the policy
-	policy = load_policy(env, cfg)
-	policy.load(file_names[0]) # TODO: This is just for testing, we will actually iterate throught file names later
-
-	if(cfg.eval_type == "CognitiveMapping"):
-		CognitiveMapEvaluation(env, landmarks, goal_landmark, policy)
-
+        # iterate through each of the trained models and run the evaluation to get the cognitive map 
+        # eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
+        # model_checkpoints = ['ppo_model_9x9_40_steps']
+        for model_checkpoint in model_checkpoints:
+            print(f"Running Cognitive Map evaluation for model checkpoint: {model_checkpoint}")
+            policy = load_policy(env, cfg)
+            policy.load(os.path.join(evaluation_models_dir, model_checkpoint))
+            # print(policy.policy)
+            # eval_module.policy = policy
+            eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
+            cog_map_fig, disparity = eval_module()
+            
+            step = get_step(model_checkpoint)
+            print(f'step: {step}')
+            wandb.log({'eval/cog_map':cog_map_fig,
+                       'eval/disparity':disparity}, step=step)
+            # wandb.log({'eval/disparity':disparity}, step=step)
 
 def train_model(env, cfg):
 
@@ -122,7 +131,7 @@ def train_model(env, cfg):
 	# Evaluation and logging
 	eval_callback = EvalCallback(env, best_model_save_path='./models/', log_path='./logs/', eval_freq=50000)
 
-	model.learn(total_timesteps=total_timesteps, callback=[WandbCallback(), checkpoint_callback,eval_callback)
+	model.learn(total_timesteps=total_timesteps, callback=[WandbCallback(), checkpoint_callback,eval_callback])
 
 	return model
 

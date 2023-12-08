@@ -24,31 +24,38 @@ cd gym-gridverse
 pip install -e .
 ```
 
-# Training
+# Usage Overview
+## Quick Start
+Both training and evaluations are run from the `run.py` script in the repo's home directory. For example:
+```bash
+# default training
+python run.py mode=train
 
-TODO: Add instructions for training the policies for experimentation
+# default evaluation
+python run.py mode=eval
+```
+## Setting Configurations with Hydra
+You will notice that parameter (like `mode`) can be specified at the command line to control the functionality of experiments. This repository uses [Hydra](https://hydra.cc/docs/intro/), a python library for that enables hierarchical configuration (e.g. parameters) composition and override. This makes experimentation for different parameters and settings as simple as changing parameters in the defined configuration files or at the command line. **The configuration files for this project are located in the directory `[conf](https://github.com/piercehowell/rl-spatial-cognitive-learning/tree/main/conf)`**. 
 
+You can view all of the default parameters without running the code by running
+```bash
+python run.py --cfg=job
+```
+
+## Training
 To run a quick example training a simple navigation task using PPO without saving to Weights and Biases, run
 ```bash
-python run.py device='cuda:0' mode=train wandb.mode='disabled'
+python run.py device='cuda:0' mode=train wandb.mode='online' model.policy_type=RecurrentPPO model.name_prefix='ppo_model_9x9' model.save_freq=1000 model.total_timesteps=2000000 model.n_steps=2048
 ```
+
+## Evaluation
+Evaluations are performed on pre-trained models, where the model checkpoints are stored in a directory under `evaluation_models`. The folder should contain model checkpoints saved as `.zip` files (as is the standard format for saving model checkpoints in stable_baselines3. Here is an example of running the `CognitiveMapEvaluation` which tries to build the agent's internal representation of the environment from its hidden layers.
+
+```bash
+python run.py mode=eval wandb.mode=online environment='gv_four_rooms.9x9_eval.yaml' eval.evaluation_model=recurrent_ppo_test eval.hidden_layer_activation=mlp_extractor.policy_net.1 landmark_spec=all_landmarks
+```
+The above command will save the results from the evaluation to wandb.
  
 
-# To set custom reset function
-If using miniconda environment, replace the "reset_functions.py" located in:
-/home/usr/miniconda/envs/hml_gridverse/lib/python 3.11/site-packages/gym-gridverse/utils
-
-# To use custom functions in env
-You can select the reset function in "gv_four_rooms.9x9.yaml" by changing the value of "name" under the "reset function" section, the custom function are:
-- Agent_1_Goal_1
-- Agent_1_Goal_3
-- Agent_3_Goal_3
-
-You can also change the distance measure used under the "reward function" section, you can choose:
-- manhattan
-- euclidean
-
-You can either edit or replace with the yaml provided in the following directory:
-/home/usr/miniconda/envs/hml_gridverse/lib/python 3.11/site-packages/gym-gridverse/registered_envs
-
-After that, you can proceed to use the Jupyter NB for training!
+## To set custom reset function
+Custom reset functions can be written in the `custom_reset_functions.py` script. It is recommend to also refer to the gridverse documentation on [reset functions](https://gym-gridverse.readthedocs.io/en/latest/tutorial/customization/reset_functions.html?highlight=reset#reset-functions).
