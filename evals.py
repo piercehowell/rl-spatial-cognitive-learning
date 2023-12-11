@@ -260,7 +260,7 @@ def mds_cognitive_mapping(cog_map_dist_matrix: np.array, landmarks: Dict[str, Li
     # TODO: this is a measure of how dissimlar they are; log this!!!
     print(disparity)
 
-    fig = plot_cognitive_map(true_ldmrk_locs, pos)
+    fig = plot_cognitive_map(true_ldmrk_locs, pos, landmark_keys=list(landmarks.keys()))
     return fig, disparity
 
         
