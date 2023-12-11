@@ -82,7 +82,10 @@ def load_policy(env, cfg):
 		model = RecurrentPPO("MlpLstmPolicy", env, verbose=2, 
 					device=cfg.device, n_steps=cfg.model.n_steps,
 					tensorboard_log=f"./results/tb/{wandb.run.id}")
-	
+	elif cfg.model.policy_type=="PPO":
+		model = PPO("MlpPolicy", env, verbose=2, 
+					device=cfg.device, n_steps=cfg.model.n_steps,
+					tensorboard_log=f"./results/tb/{wandb.run.id}")
 	return model
 
 def evaluate_model(env, cfg):
@@ -108,7 +111,7 @@ def evaluate_model(env, cfg):
         for model_checkpoint in model_checkpoints:
             print(f"Running Cognitive Map evaluation for model checkpoint: {model_checkpoint}")
             policy = load_policy(env, cfg)
-            policy.load(os.path.join(evaluation_models_dir, model_checkpoint))
+            policy = policy.load(os.path.join(evaluation_models_dir, model_checkpoint), device=cfg.device)
             # print(policy.policy)
             # eval_module.policy = policy
             eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
