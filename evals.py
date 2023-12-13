@@ -8,6 +8,7 @@ import numpy as np
 from sklearn import manifold
 from sklearn.decomposition import PCA
 from scipy.spatial import procrustes
+from scipy.stats import pearsonr
 from sklearn.metrics.pairwise import cosine_distances, euclidean_distances
 import matplotlib.pyplot as plt
 import os
@@ -127,12 +128,8 @@ class CognitiveMapEvaluation(nn.Module):
         # compute the distance matrix for the hidden layer activations
         dist_matrix = self.hidden_layers_to_distance_matrix(self.hidden_layer_activations, dist_func=self._dist_func)
 
-
-        # generate the cognitive map and return it (as a figure)
-        cog_map, disparity = mds_cognitive_mapping(dist_matrix, self._landmarks, self._seed)
-
         # Save the cognitive map to wandb or something else.
-        return cog_map, disparity
+        return mds_cognitive_mapping(dist_matrix, self._landmarks, self._seed)
     
     @property
     def landmarks(self):
@@ -257,10 +254,14 @@ def mds_cognitive_mapping(cog_map_dist_matrix: np.array, landmarks: Dict[str, Li
     # shift the data such that the reference points line up.
     pos, true_ldmrk_locs = shift_embedding_to_reference(pos, true_ldmrk_locs, reference_idx=0)
     
-    # TODO: this is a measure of how dissimlar they are; log this!!!
-    print(disparity)
+    # TODO: Move to a separate evaluation type, but this is convient here for now
+    pos_distances = euclidean_distances(pos)
+    true_distances = euclidean_distances(true_ldmrk_locs)
+
+    stat, pvalue = pearsonr(pos_distances.flatten(), true_distances.flatten())
+    print(stat)
 
     fig = plot_cognitive_map(true_ldmrk_locs, pos, landmark_keys=list(landmarks.keys()))
-    return fig, disparity
+    return fig, disparity, stat
 
         
