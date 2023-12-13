@@ -115,12 +115,13 @@ def evaluate_model(env, cfg):
             # print(policy.policy)
             # eval_module.policy = policy
             eval_module = CognitiveMapEvaluation(cfg, env, landmarks, A, policy)
-            cog_map_fig, disparity = eval_module()
+            cog_map_fig, disparity, dist_correlation_coeff = eval_module()
             
             step = get_step(model_checkpoint)
             print(f'step: {step}')
             wandb.log({'eval/cog_map':cog_map_fig,
-                       'eval/disparity':disparity}, step=step)
+                       'eval/disparity':disparity,
+                       'eval/dist_correlation_coeff':dist_correlation_coeff}, step=step)
             # wandb.log({'eval/disparity':disparity}, step=step)
 
 def train_model(env, cfg):
@@ -148,7 +149,8 @@ def hydra_experiment(cfg: DictConfig) -> None:
 	print(f"Output Directory : {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}")
 
 	with wandb.init(project="rl_spatial_cognitive_learning", sync_tensorboard=True, 
-				monitor_gym=True, config=dict(cfg), mode=cfg.wandb.mode):
+				monitor_gym=True, config=dict(cfg), mode=cfg.wandb.mode,
+                group=cfg.wandb.group):
 		run_experiment(cfg)
 
 
