@@ -1,6 +1,19 @@
 # rl-spatial-cognitive-learning
+The repository hosts the code and corresponding experiments for our proposed algorithm to extract euclidean cognitive maps from feature representations learned in deep reinforcement learning agents. The diagram below summarizes our dimensionality reduction approach.
+![cog_mapping_alignment_diagram](https://github.com/piercehowell/rl-spatial-cognitive-learning/assets/19626892/ca32ef27-1eb9-434b-9de2-105f4b84146a)
 
-The repo hosts the code for experiments for analyzing spatial cognitive learning in  deep reinforcement learning.
+**Please cite our repository if you find this work beneficial**
+```
+@mis{howellRlSpatialCog,
+  author = {Howell, Pierce and Diaz, Kurt Contreras and Sang, Brian},
+  title = {Comparing Reinforcement Learning Cognitive Maps to Human Cognitive Maps},
+  year = {2023},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/piercehowell/rl-spatial-cognitive-learning}},
+}
+
+```
 
 # Installation
 Install Anaconda/Miniconda via their website. Then create a conda env with
