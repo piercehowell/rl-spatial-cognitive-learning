@@ -2,7 +2,7 @@
 The repository hosts the code and corresponding experiments for our proposed algorithm to extract euclidean cognitive maps from feature representations learned in deep reinforcement learning agents. The diagram below summarizes our dimensionality reduction approach.
 ![cog_mapping_alignment_diagram](https://github.com/piercehowell/rl-spatial-cognitive-learning/assets/19626892/ca32ef27-1eb9-434b-9de2-105f4b84146a)
 
-**Please cite our repository if you find this work beneficial**
+**Please cite our repository if you find our work useful!**
 ```
 @mis{howellRlSpatialCog,
   author = {Howell, Pierce and Diaz, Kurt Contreras and Sang, Brian},
